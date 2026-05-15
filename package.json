@@ -13,7 +13,7 @@
     "mysql": "^2.18.1",
     "net": "^1.0.2",
     "node-cron": "^3.0.2",
-    "queclink-parser": "^1.5.0",
+    "queclink-parser": "^1.9.31",
     "uuid": "^9.0.1"
   },
   "keywords": [],

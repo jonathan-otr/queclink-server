@@ -291,7 +291,7 @@ async function serveron(){
             // console.log('Envíando respuesta de heartbeat');
             socket.write('+SACK:GTHBD,,'+datas.serialId+'$');
             break;
-            
+
             // default
             default:
             // console.log('Respuesta de comando...');
@@ -461,14 +461,14 @@ function guardardatosendb(dataObjects){
     if (err) {
       console.log(err);
     }else {
-      // console.log('insertado correctamente');
+      console.log('insertado correctamente');
     }
   });
   db.query(sql2, dataObjects[1], (err, results) => {
     if (err) {
       console.log(err);
     }else {
-      // console.log('insertado correctamente');
+      console.log('insertado correctamente');
     }
   });
 }
@@ -491,7 +491,19 @@ async function datagl320mg(datos, socket) {
       const dataObjects1 = await generatedataobjectsGL320MG('STT',parsedfri,socket);
       //console.log('Datos de GTFRI recibidos y procesados: ', dataObjects1);
       guardardatosendb(dataObjects1);
-      break;
+    break;
+    case '+RESP:GTSTT':
+      const parsedfri2 = await parseGTFRI2(datos);  // si parseGTFRI es async
+      const dataObjects12 = await generatedataobjectsGL320MG2('STT',parsedfri2,socket);
+      //console.log('Datos de GTFRI recibidos y procesados: ', dataObjects1);
+      guardardatosendb(dataObjects12);
+    break;
+    case '+BUFF:GTSTT':
+      const parsedfri3 = await parseGTFRI2(datos);  // si parseGTFRI es async
+      const dataObjects13 = await generatedataobjectsGL320MG2('STT',parsedfri3,socket);
+      //console.log('Datos de GTFRI recibidos y procesados: ', dataObjects1);
+      guardardatosendb(dataObjects13);
+    break;
     case '+BUFF:GTFRI':
       const parsedfribuffer = await parseGTFRI(datos); // igual
       const dataObjects2 = await generatedataobjectsGL320MG('STT',parsedfribuffer,socket);
@@ -538,6 +550,31 @@ function parseGTFRI(message) {
     batteryPercentage: parts[19],   // 100
     sendTime: parts[20],            // 20200806074337
     countNumber: parts[21],         // 00E3
+  };
+  return result;
+}
+
+function parseGTFRI2(message) {
+  const parts = message;
+  const result = {
+    protocolVersion: parts[1],      // C30303
+    imei: parts[2],                 // 860201068740367
+    deviceName: parts[3],           // gl320m
+    batteryPercentage: parts[4],    // 42
+    gpsFix: parts[5],               // 1
+    speed: parts[6],                // 0.0
+    azimuth: parts[7],              // 0
+    altitude: parts[8],             // 2270.6
+    longitude: parts[9],            // -99.223041
+    latitude: parts[10],            // 19.663972
+    gpsUtcTime: parts[11],          // 20260515191203
+    mcc: parts[12],                 // 0334
+    mnc: parts[13],                 // 0020
+    lac: parts[14],                 // 15F9
+    cellId: parts[15],              // 8CF5
+    reserved: parts[16] || null,    // vacío
+    sendTime: parts[17],            // 20260515191205
+    countNumber: parts[18]          // 003E
   };
   return result;
 }
@@ -626,6 +663,62 @@ async function generatedataobjectsGL320MG(tipo,datas,socket){
   return [dataObject0,dataObject1];
 }
 
+
+async function generatedataobjectsGL320MG2(tipo,datas,socket){
+  var fechaHora = parseCustomDate(datas.sendTime);
+  const fechaFormateada = fechaHora.toISOString().split('T')[0];
+  const horaFormateada = fechaHora.toISOString().split('T')[1].split('.')[0];
+  mode = 0;
+  if (tipo === 'ALT' || datas.protocolVersion === '+RESP:GTSOS' || datas.protocolVersion === '+BUFF:GTSOS') {
+    mode = 1;
+  }
+  dataObject0 = {
+    date_connected: fechaHora || null,
+    fecha: fechaFormateada || null,
+    date: fechaFormateada || null,
+    time: horaFormateada || null,
+    Device_ID: datas.imei || null,
+    Command_Type: tipo,
+    IN_STATE: '0000',
+    MODE: mode,
+    MCC:datas.mcc,
+    MNC:datas.mnc,
+    LAC:datas.lac,
+    LAT: datas.latitude,
+    LON: datas.longitude,
+    altitude: datas.altitude ? datas.altitude.toString().slice(0, 4) : 0,
+    SPD: datas.speed || 0,
+    CRS: datas.azimuth || 0,
+    FIX: datas.gpsFix ? 1 : 0,
+    BAT_PERCENT: datas.batteryPercentage || 0,
+    H_METTER:0
+  };
+  dataObject1 = {
+    date_connected: fechaHora || null,
+    date: fechaFormateada || null,
+    time: horaFormateada || null,
+    Device_ID: datas.imei || null,
+    Command_Type: tipo,
+    IN_STATE: '0000',
+    MODE: mode,
+    MCC:datas.mcc,
+    MNC:datas.mnc,
+    LAC:datas.lac,
+    LAT: datas.latitude,
+    LON: datas.longitude,
+    altitude: datas.altitude ? datas.altitude.toString().slice(0, 4) : 0,
+    SPD: datas.speed || 0,
+    CRS: datas.azimuth || 0,
+    FIX: datas.gpsFix ? 1 : 0,
+    BAT_PERCENT: datas.batteryPercentage || 0,
+    H_METTER: 0,
+    socket:socket,
+  };
+  //console.log('Datos generados para GL320MG:', dataObject0);
+  //console.log('Datos generados para GL320MG:', dataObject1);
+  return [dataObject0,dataObject1];
+}
+
 function parseCustomDate(sendTime) {
   if (!sendTime || sendTime.length !== 14) return null;
   const year = parseInt(sendTime.substring(0, 4));
@@ -636,6 +729,7 @@ function parseCustomDate(sendTime) {
   const second = parseInt(sendTime.substring(12, 14));
   // Creamos una fecha en UTC
   const utcDate = new Date(Date.UTC(year, month, day, hour, minute, second));
+  utcDate.setHours(utcDate.getHours() - 1);
   return utcDate;
 }
 
@@ -653,6 +747,6 @@ app.listen(app.get('port'), () => {
   // console.log(`Servidor en puerto ${app.get('port')}`);
 });
 
-app.get('/queclink_server', function (req, res) {
+app.get('/glserver', function (req, res) {
   res.sendFile('index.html', { root: './src/public/' });
 });
